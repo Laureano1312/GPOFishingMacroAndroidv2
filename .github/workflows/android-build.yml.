@@ -1,0 +1,53 @@
+
+name: Build GPO Fishing Macro APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Buscar y extraer proyecto
+        shell: bash
+        run: |
+          set -eu
+          mkdir -p /tmp/gpo-project
+          ZIP="$(find . -maxdepth 2 -type f -name '*.zip' | head -n 1)"
+          if [ -z "$ZIP" ]; then
+            echo "No se encontró el ZIP del proyecto."
+            exit 1
+          fi
+          unzip -q "$ZIP" -d /tmp/gpo-project
+          echo "Contenido del ZIP:"
+          find /tmp/gpo-project -maxdepth 4 -type f | head -100
+          WRAPPER="$(find /tmp/gpo-project -type f -name gradlew | head -n 1)"
+          if [ -z "$WRAPPER" ]; then
+            echo "No se encontró gradlew. Hay que revisar la estructura del proyecto."
+            exit 1
+          fi
+          echo "PROJECT_DIR=$(dirname "$WRAPPER")" >> "$GITHUB_ENV"
+
+      - name: Compilar APK
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Guardar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GPO-Fishing-Macro-APK
+          path: '**/build/outputs/apk/debug/*.apk'
+          if-no-files-found: error
